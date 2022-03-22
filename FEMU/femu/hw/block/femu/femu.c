@@ -362,7 +362,7 @@ static int nvme_init_namespace(FemuCtrl *n, NvmeNamespace *ns, Error **errp)
 static int nvme_init_namespaces(FemuCtrl *n, Error **errp)
 {
     /* FIXME: FEMU only supports 1 namesapce now */
-    assert(n->num_namespaces == 1);
+    //assert(n->num_namespaces == 1);
 
     for (int i = 0; i < n->num_namespaces; i++) {
         NvmeNamespace *ns = &n->namespaces[i];
