@@ -2,19 +2,19 @@
 
 //#define FEMU_DEBUG_FTL
 
-static void *ftl_thread(void *arg);
+static void *hybrid_ftl_thread(void *arg);
 
-static inline bool should_gc(struct ssd *ssd)
+static inline bool hybrid_should_gc(struct ssd *ssd)
 {
     return (ssd->lm.free_line_cnt <= ssd->sp.gc_thres_lines);
 }
 
-static inline bool should_gc_high(struct ssd *ssd)
+static inline bool hybrid_should_gc_high(struct ssd *ssd)
 {
     return (ssd->lm.free_line_cnt <= ssd->sp.gc_thres_lines_high);
 }
 
-static inline struct ppa get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
+static inline struct ppa hybrid_get_maptbl_ent(struct ssd *ssd, uint64_t lpn)
 {
     return ssd->maptbl[lpn];
 }
@@ -81,7 +81,7 @@ static inline void victim_line_set_pos(void *a, size_t pos)
     ((struct line *)a)->pos = pos;
 }
 
-static void ssd_init_lines(struct ssd *ssd)
+static void hybrid_ssd_init_lines(struct ssd *ssd)
 {
     struct ssdparams *spp = &ssd->sp;
     struct line_mgmt *lm = &ssd->lm;
@@ -114,7 +114,7 @@ static void ssd_init_lines(struct ssd *ssd)
     lm->full_line_cnt = 0;
 }
 
-static void ssd_init_write_pointer(struct ssd *ssd)
+static void hybrid_ssd_init_write_pointer(struct ssd *ssd)
 {
     struct write_pointer *wpp = &ssd->wp;
     struct line_mgmt *lm = &ssd->lm;
@@ -138,7 +138,7 @@ static inline void check_addr(int a, int max)
     ftl_assert(a >= 0 && a < max);
 }
 
-static struct line *get_next_free_line(struct ssd *ssd)
+static struct line *hybrid_get_next_free_line(struct ssd *ssd)
 {
     struct line_mgmt *lm = &ssd->lm;
     struct line *curline = NULL;
@@ -154,7 +154,7 @@ static struct line *get_next_free_line(struct ssd *ssd)
     return curline;
 }
 
-static void ssd_advance_write_pointer(struct ssd *ssd)
+static void hybrid_ssd_advance_write_pointer(struct ssd *ssd)
 {
     struct ssdparams *spp = &ssd->sp;
     struct write_pointer *wpp = &ssd->wp;
@@ -190,7 +190,7 @@ static void ssd_advance_write_pointer(struct ssd *ssd)
                 /* current line is used up, pick another empty line */
                 check_addr(wpp->blk, spp->blks_per_pl);
                 wpp->curline = NULL;
-                wpp->curline = get_next_free_line(ssd);
+                wpp->curline = hybrid_get_next_free_line(ssd);
                 if (!wpp->curline) {
                     /* TODO */
                     abort();
@@ -208,7 +208,7 @@ static void ssd_advance_write_pointer(struct ssd *ssd)
     }
 }
 
-static struct ppa get_new_page(struct ssd *ssd)
+static struct ppa hybrid_get_new_page(struct ssd *ssd)
 {
     struct write_pointer *wpp = &ssd->wp;
     struct ppa ppa;
@@ -223,7 +223,7 @@ static struct ppa get_new_page(struct ssd *ssd)
     return ppa;
 }
 
-static void check_params(struct ssdparams *spp)
+static void hybrid_check_params(struct ssdparams *spp)
 {
     /*
      * we are using a general write pointer increment method now, no need to
@@ -234,7 +234,7 @@ static void check_params(struct ssdparams *spp)
     //ftl_assert(is_power_of_2(spp->nchs));
 }
 
-static void ssd_init_params(struct ssdparams *spp)
+static void hybrid_ssd_init_params(struct ssdparams *spp)
 {
     spp->secsz = 512;
     spp->secs_per_pg = 8;
@@ -283,10 +283,10 @@ static void ssd_init_params(struct ssdparams *spp)
     spp->enable_gc_delay = true;
 
 
-    check_params(spp);
+    hybrid_check_params(spp);
 }
 
-static void ssd_init_nand_page(struct nand_page *pg, struct ssdparams *spp)
+static void hybrid_ssd_init_nand_page(struct nand_page *pg, struct ssdparams *spp)
 {
     pg->nsecs = spp->secs_per_pg;
     pg->sec = g_malloc0(sizeof(nand_sec_status_t) * pg->nsecs);
@@ -296,12 +296,12 @@ static void ssd_init_nand_page(struct nand_page *pg, struct ssdparams *spp)
     pg->status = PG_FREE;
 }
 
-static void ssd_init_nand_blk(struct nand_block *blk, struct ssdparams *spp)
+static void hybrid_ssd_init_nand_blk(struct nand_block *blk, struct ssdparams *spp)
 {
     blk->npgs = spp->pgs_per_blk;
     blk->pg = g_malloc0(sizeof(struct nand_page) * blk->npgs);
     for (int i = 0; i < blk->npgs; i++) {
-        ssd_init_nand_page(&blk->pg[i], spp);
+        hybrid_ssd_init_nand_page(&blk->pg[i], spp);
     }
     blk->ipc = 0;
     blk->vpc = 0;
@@ -309,38 +309,38 @@ static void ssd_init_nand_blk(struct nand_block *blk, struct ssdparams *spp)
     blk->wp = 0;
 }
 
-static void ssd_init_nand_plane(struct nand_plane *pl, struct ssdparams *spp)
+static void hybrid_ssd_init_nand_plane(struct nand_plane *pl, struct ssdparams *spp)
 {
     pl->nblks = spp->blks_per_pl;
     pl->blk = g_malloc0(sizeof(struct nand_block) * pl->nblks);
     for (int i = 0; i < pl->nblks; i++) {
-        ssd_init_nand_blk(&pl->blk[i], spp);
+        hybrid_ssd_init_nand_blk(&pl->blk[i], spp);
     }
 }
 
-static void ssd_init_nand_lun(struct nand_lun *lun, struct ssdparams *spp)
+static void hybrid_ssd_init_nand_lun(struct nand_lun *lun, struct ssdparams *spp)
 {
     lun->npls = spp->pls_per_lun;
     lun->pl = g_malloc0(sizeof(struct nand_plane) * lun->npls);
     for (int i = 0; i < lun->npls; i++) {
-        ssd_init_nand_plane(&lun->pl[i], spp);
+        hybrid_ssd_init_nand_plane(&lun->pl[i], spp);
     }
     lun->next_lun_avail_time = 0;
     lun->busy = false;
 }
 
-static void ssd_init_ch(struct ssd_channel *ch, struct ssdparams *spp)
+static void hybrid_ssd_init_ch(struct ssd_channel *ch, struct ssdparams *spp)
 {
     ch->nluns = spp->luns_per_ch;
     ch->lun = g_malloc0(sizeof(struct nand_lun) * ch->nluns);
     for (int i = 0; i < ch->nluns; i++) {
-        ssd_init_nand_lun(&ch->lun[i], spp);
+        hybrid_ssd_init_nand_lun(&ch->lun[i], spp);
     }
     ch->next_ch_avail_time = 0;
     ch->busy = 0;
 }
 
-static void ssd_init_maptbl(struct ssd *ssd)
+static void hybrid_ssd_init_maptbl(struct ssd *ssd)
 {
     struct ssdparams *spp = &ssd->sp;
 
@@ -350,7 +350,7 @@ static void ssd_init_maptbl(struct ssd *ssd)
     }
 }
 
-static void ssd_init_rmap(struct ssd *ssd)
+static void hybrid_ssd_init_rmap(struct ssd *ssd)
 {
     struct ssdparams *spp = &ssd->sp;
 
@@ -360,34 +360,34 @@ static void ssd_init_rmap(struct ssd *ssd)
     }
 }
 
-void ssd_init(FemuCtrl *n)
+void hybrid_ssd_init(FemuCtrl *n)
 {
     struct ssd *ssd = n->ssd;
     struct ssdparams *spp = &ssd->sp;
 
     ftl_assert(ssd);
 
-    ssd_init_params(spp);
+    hybrid_ssd_init_params(spp);
 
     /* initialize ssd internal layout architecture */
     ssd->ch = g_malloc0(sizeof(struct ssd_channel) * spp->nchs);
     for (int i = 0; i < spp->nchs; i++) {
-        ssd_init_ch(&ssd->ch[i], spp);
+        hybrid_ssd_init_ch(&ssd->ch[i], spp);
     }
 
     /* initialize maptbl */
-    ssd_init_maptbl(ssd);
+    hybrid_ssd_init_maptbl(ssd);
 
     /* initialize rmap */
-    ssd_init_rmap(ssd);
+    hybrid_ssd_init_rmap(ssd);
 
     /* initialize all the lines */
-    ssd_init_lines(ssd);
+    hybrid_ssd_init_lines(ssd);
 
     /* initialize write pointer, this is how we allocate new pages for writes */
-    ssd_init_write_pointer(ssd);
+    hybrid_ssd_init_write_pointer(ssd);
 
-    qemu_thread_create(&ssd->ftl_thread, "FEMU-FTL-Thread", ftl_thread, n,
+    qemu_thread_create(&ssd->ftl_thread, "FEMU-FTL-Thread", hybrid_ftl_thread, n,
                        QEMU_THREAD_JOINABLE);
 }
 
@@ -453,7 +453,7 @@ static inline struct nand_page *get_pg(struct ssd *ssd, struct ppa *ppa)
     return &(blk->pg[ppa->g.pg]);
 }
 
-static uint64_t ssd_advance_status(struct ssd *ssd, struct ppa *ppa, struct
+static uint64_t hybrid_ssd_advance_status(struct ssd *ssd, struct ppa *ppa, struct
         nand_cmd *ncmd)
 {
     int c = ncmd->cmd;
@@ -525,7 +525,7 @@ static uint64_t ssd_advance_status(struct ssd *ssd, struct ppa *ppa, struct
 }
 
 /* update SSD status about one page from PG_VALID -> PG_VALID */
-static void mark_page_invalid(struct ssd *ssd, struct ppa *ppa)
+static void hybrid_mark_page_invalid(struct ssd *ssd, struct ppa *ppa)
 {
     struct line_mgmt *lm = &ssd->lm;
     struct ssdparams *spp = &ssd->sp;
@@ -572,7 +572,7 @@ static void mark_page_invalid(struct ssd *ssd, struct ppa *ppa)
     }
 }
 
-static void mark_page_valid(struct ssd *ssd, struct ppa *ppa)
+static void hybrid_mark_page_valid(struct ssd *ssd, struct ppa *ppa)
 {
     struct nand_block *blk = NULL;
     struct nand_page *pg = NULL;
@@ -594,7 +594,7 @@ static void mark_page_valid(struct ssd *ssd, struct ppa *ppa)
     line->vpc++;
 }
 
-static void mark_block_free(struct ssd *ssd, struct ppa *ppa)
+static void hybrid_mark_block_free(struct ssd *ssd, struct ppa *ppa)
 {
     struct ssdparams *spp = &ssd->sp;
     struct nand_block *blk = get_blk(ssd, ppa);
@@ -614,7 +614,7 @@ static void mark_block_free(struct ssd *ssd, struct ppa *ppa)
     blk->erase_cnt++;
 }
 
-static void gc_read_page(struct ssd *ssd, struct ppa *ppa)
+static void hybrid_gc_read_page(struct ssd *ssd, struct ppa *ppa)
 {
     /* advance ssd status, we don't care about how long it takes */
     if (ssd->sp.enable_gc_delay) {
@@ -622,35 +622,35 @@ static void gc_read_page(struct ssd *ssd, struct ppa *ppa)
         gcr.type = GC_IO;
         gcr.cmd = NAND_READ;
         gcr.stime = 0;
-        ssd_advance_status(ssd, ppa, &gcr);
+        hybrid_ssd_advance_status(ssd, ppa, &gcr);
     }
 }
 
 /* move valid page data (already in DRAM) from victim line to a new page */
-static uint64_t gc_write_page(struct ssd *ssd, struct ppa *old_ppa)
+static uint64_t hybrid_gc_write_page(struct ssd *ssd, struct ppa *old_ppa)
 {
     struct ppa new_ppa;
     struct nand_lun *new_lun;
     uint64_t lpn = get_rmap_ent(ssd, old_ppa);
 
     ftl_assert(valid_lpn(ssd, lpn));
-    new_ppa = get_new_page(ssd);
+    new_ppa = hybrid_get_new_page(ssd);
     /* update maptbl */
     set_maptbl_ent(ssd, lpn, &new_ppa);
     /* update rmap */
     set_rmap_ent(ssd, lpn, &new_ppa);
 
-    mark_page_valid(ssd, &new_ppa);
+    hybrid_mark_page_valid(ssd, &new_ppa);
 
     /* need to advance the write pointer here */
-    ssd_advance_write_pointer(ssd);
+    hybrid_ssd_advance_write_pointer(ssd);
 
     if (ssd->sp.enable_gc_delay) {
         struct nand_cmd gcw;
         gcw.type = GC_IO;
         gcw.cmd = NAND_WRITE;
         gcw.stime = 0;
-        ssd_advance_status(ssd, &new_ppa, &gcw);
+        hybrid_ssd_advance_status(ssd, &new_ppa, &gcw);
     }
 
     /* advance per-ch gc_endtime as well */
@@ -665,7 +665,7 @@ static uint64_t gc_write_page(struct ssd *ssd, struct ppa *old_ppa)
     return 0;
 }
 
-static struct line *select_victim_line(struct ssd *ssd, bool force)
+static struct line *hybrid_select_victim_line(struct ssd *ssd, bool force)
 {
     struct line_mgmt *lm = &ssd->lm;
     struct line *victim_line = NULL;
@@ -688,7 +688,7 @@ static struct line *select_victim_line(struct ssd *ssd, bool force)
 }
 
 /* here ppa identifies the block we want to clean */
-static void clean_one_block(struct ssd *ssd, struct ppa *ppa)
+static void hybrid_clean_one_block(struct ssd *ssd, struct ppa *ppa)
 {
     struct ssdparams *spp = &ssd->sp;
     struct nand_page *pg_iter = NULL;
@@ -700,9 +700,9 @@ static void clean_one_block(struct ssd *ssd, struct ppa *ppa)
         /* there shouldn't be any free page in victim blocks */
         ftl_assert(pg_iter->status != PG_FREE);
         if (pg_iter->status == PG_VALID) {
-            gc_read_page(ssd, ppa);
+            hybrid_gc_read_page(ssd, ppa);
             /* delay the maptbl update until "write" happens */
-            gc_write_page(ssd, ppa);
+            hybrid_gc_write_page(ssd, ppa);
             cnt++;
         }
     }
@@ -710,7 +710,7 @@ static void clean_one_block(struct ssd *ssd, struct ppa *ppa)
     ftl_assert(get_blk(ssd, ppa)->vpc == cnt);
 }
 
-static void mark_line_free(struct ssd *ssd, struct ppa *ppa)
+static void hybrid_mark_line_free(struct ssd *ssd, struct ppa *ppa)
 {
     struct line_mgmt *lm = &ssd->lm;
     struct line *line = get_line(ssd, ppa);
@@ -721,7 +721,7 @@ static void mark_line_free(struct ssd *ssd, struct ppa *ppa)
     lm->free_line_cnt++;
 }
 
-static int do_gc(struct ssd *ssd, bool force)
+static int hybrid_do_gc(struct ssd *ssd, bool force)
 {
     struct line *victim_line = NULL;
     struct ssdparams *spp = &ssd->sp;
@@ -729,7 +729,7 @@ static int do_gc(struct ssd *ssd, bool force)
     struct ppa ppa;
     int ch, lun;
 
-    victim_line = select_victim_line(ssd, force);
+    victim_line = hybrid_select_victim_line(ssd, force);
     if (!victim_line) {
         return -1;
     }
@@ -746,15 +746,15 @@ static int do_gc(struct ssd *ssd, bool force)
             ppa.g.lun = lun;
             ppa.g.pl = 0;
             lunp = get_lun(ssd, &ppa);
-            clean_one_block(ssd, &ppa);
-            mark_block_free(ssd, &ppa);
+            hybrid_clean_one_block(ssd, &ppa);
+            hybrid_mark_block_free(ssd, &ppa);
 
             if (spp->enable_gc_delay) {
                 struct nand_cmd gce;
                 gce.type = GC_IO;
                 gce.cmd = NAND_ERASE;
                 gce.stime = 0;
-                ssd_advance_status(ssd, &ppa, &gce);
+                hybrid_ssd_advance_status(ssd, &ppa, &gce);
             }
 
             lunp->gc_endtime = lunp->next_lun_avail_time;
@@ -762,12 +762,12 @@ static int do_gc(struct ssd *ssd, bool force)
     }
 
     /* update line status */
-    mark_line_free(ssd, &ppa);
+    hybrid_mark_line_free(ssd, &ppa);
 
     return 0;
 }
 
-static uint64_t ssd_read(struct ssd *ssd, NvmeRequest *req)
+static uint64_t hybrid_ssd_read(struct ssd *ssd, NvmeRequest *req)
 {
     struct ssdparams *spp = &ssd->sp;
     uint64_t lba = req->slba;
@@ -784,7 +784,7 @@ static uint64_t ssd_read(struct ssd *ssd, NvmeRequest *req)
 
     /* normal IO read path */
     for (lpn = start_lpn; lpn <= end_lpn; lpn++) {
-        ppa = get_maptbl_ent(ssd, lpn);
+        ppa = hybrid_get_maptbl_ent(ssd, lpn);
         if (!mapped_ppa(&ppa) || !valid_ppa(ssd, &ppa)) {
             //printf("%s,lpn(%" PRId64 ") not mapped to valid ppa\n", ssd->ssdname, lpn);
             //printf("Invalid ppa,ch:%d,lun:%d,blk:%d,pl:%d,pg:%d,sec:%d\n",
@@ -796,14 +796,14 @@ static uint64_t ssd_read(struct ssd *ssd, NvmeRequest *req)
         srd.type = USER_IO;
         srd.cmd = NAND_READ;
         srd.stime = req->stime;
-        sublat = ssd_advance_status(ssd, &ppa, &srd);
+        sublat = hybrid_ssd_advance_status(ssd, &ppa, &srd);
         maxlat = (sublat > maxlat) ? sublat : maxlat;
     }
 
     return maxlat;
 }
 
-static uint64_t ssd_write(struct ssd *ssd, NvmeRequest *req)
+static uint64_t hybrid_ssd_write(struct ssd *ssd, NvmeRequest *req)
 {
     uint64_t lba = req->slba;
     struct ssdparams *spp = &ssd->sp;
@@ -819,46 +819,46 @@ static uint64_t ssd_write(struct ssd *ssd, NvmeRequest *req)
         ftl_err("start_lpn=%"PRIu64",tt_pgs=%d\n", start_lpn, ssd->sp.tt_pgs);
     }
 
-    while (should_gc_high(ssd)) {
-        /* perform GC here until !should_gc(ssd) */
-        r = do_gc(ssd, true);
+    while (hybrid_should_gc_high(ssd)) {
+        /* perform GC here until !hybrid_should_gc(ssd) */
+        r = hybrid_do_gc(ssd, true);
         if (r == -1)
             break;
     }
 
     for (lpn = start_lpn; lpn <= end_lpn; lpn++) {
-        ppa = get_maptbl_ent(ssd, lpn);
+        ppa = hybrid_get_maptbl_ent(ssd, lpn);
         if (mapped_ppa(&ppa)) {
             /* update old page information first */
-            mark_page_invalid(ssd, &ppa);
+            hybrid_mark_page_invalid(ssd, &ppa);
             set_rmap_ent(ssd, INVALID_LPN, &ppa);
         }
 
         /* new write */
-        ppa = get_new_page(ssd);
+        ppa = hybrid_get_new_page(ssd);
         /* update maptbl */
         set_maptbl_ent(ssd, lpn, &ppa);
         /* update rmap */
         set_rmap_ent(ssd, lpn, &ppa);
 
-        mark_page_valid(ssd, &ppa);
+        hybrid_mark_page_valid(ssd, &ppa);
 
         /* need to advance the write pointer here */
-        ssd_advance_write_pointer(ssd);
+        hybrid_ssd_advance_write_pointer(ssd);
 
         struct nand_cmd swr;
         swr.type = USER_IO;
         swr.cmd = NAND_WRITE;
         swr.stime = req->stime;
         /* get latency statistics */
-        curlat = ssd_advance_status(ssd, &ppa, &swr);
+        curlat = hybrid_ssd_advance_status(ssd, &ppa, &swr);
         maxlat = (curlat > maxlat) ? curlat : maxlat;
     }
 
     return maxlat;
 }
 
-static void *ftl_thread(void *arg)
+static void *hybrid_ftl_thread(void *arg)
 {
     FemuCtrl *n = (FemuCtrl *)arg;
     struct ssd *ssd = n->ssd;
@@ -888,10 +888,10 @@ static void *ftl_thread(void *arg)
             ftl_assert(req);
             switch (req->cmd.opcode) {
             case NVME_CMD_WRITE:
-                lat = ssd_write(ssd, req);
+                lat = hybrid_ssd_write(ssd, req);
                 break;
             case NVME_CMD_READ:
-                lat = ssd_read(ssd, req);
+                lat = hybrid_ssd_read(ssd, req);
                 break;
             case NVME_CMD_DSM:
                 lat = 0;
@@ -910,8 +910,8 @@ static void *ftl_thread(void *arg)
             }
 
             /* clean one line if needed (in the background) */
-            if (should_gc(ssd)) {
-                do_gc(ssd, false);
+            if (hybrid_should_gc(ssd)) {
+                hybrid_do_gc(ssd, false);
             }
         }
     }

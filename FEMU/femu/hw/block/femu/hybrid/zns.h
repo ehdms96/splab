@@ -117,7 +117,7 @@ typedef struct NvmeNamespaceParams {
     uint32_t zd_extension_size;
 } NvmeNamespaceParams;
 
-static inline uint32_t zns_nsid(NvmeNamespace *ns)
+static inline uint32_t hybrid_nsid(NvmeNamespace *ns)
 {
     if (ns) {
         return ns->id;
@@ -126,65 +126,65 @@ static inline uint32_t zns_nsid(NvmeNamespace *ns)
     return -1;
 }
 
-static inline NvmeLBAF *zns_ns_lbaf(NvmeNamespace *ns)
+static inline NvmeLBAF *hybrid_ns_lbaf(NvmeNamespace *ns)
 {
     NvmeIdNs *id_ns = &ns->id_ns;
     return &id_ns->lbaf[NVME_ID_NS_FLBAS_INDEX(id_ns->flbas)];
 }
 
-static inline uint8_t zns_ns_lbads(NvmeNamespace *ns)
+static inline uint8_t hybrid_ns_lbads(NvmeNamespace *ns)
 {
     /* NvmeLBAF */
-    return zns_ns_lbaf(ns)->lbads;
+    return hybrid_ns_lbaf(ns)->lbads;
 }
 
 /* calculate the number of LBAs that the namespace can accomodate */
-static inline uint64_t zns_ns_nlbas(NvmeNamespace *ns)
+static inline uint64_t hybrid_ns_nlbas(NvmeNamespace *ns)
 {
-    return ns->size >> zns_ns_lbads(ns);
+    return ns->size >> hybrid_ns_lbads(ns);
 }
 
 /* convert an LBA to the equivalent in bytes */
-static inline size_t zns_l2b(NvmeNamespace *ns, uint64_t lba)
+static inline size_t hybrid_l2b(NvmeNamespace *ns, uint64_t lba)
 {
-    return lba << zns_ns_lbads(ns);
+    return lba << hybrid_ns_lbads(ns);
 }
 
-static inline NvmeZoneState zns_get_zone_state(NvmeZone *zone)
+static inline NvmeZoneState hybrid_get_zone_state(NvmeZone *zone)
 {
     return zone->d.zs >> 4;
 }
 
-static inline void zns_set_zone_state(NvmeZone *zone, NvmeZoneState state)
+static inline void hybrid_set_zone_state(NvmeZone *zone, NvmeZoneState state)
 {
     zone->d.zs = state << 4;
 }
 
-static inline uint64_t zns_zone_rd_boundary(NvmeNamespace *ns, NvmeZone *zone)
+static inline uint64_t hybrid_zone_rd_boundary(NvmeNamespace *ns, NvmeZone *zone)
 {
     return zone->d.zslba + ns->ctrl->zone_size;
 }
 
-static inline uint64_t zns_zone_wr_boundary(NvmeZone *zone)
+static inline uint64_t hybrid_zone_wr_boundary(NvmeZone *zone)
 {
     return zone->d.zslba + zone->d.zcap;
 }
 
-static inline bool zns_wp_is_valid(NvmeZone *zone)
+static inline bool hybrid_wp_is_valid(NvmeZone *zone)
 {
-    uint8_t st = zns_get_zone_state(zone);
+    uint8_t st = hybrid_get_zone_state(zone);
 
     return st != NVME_ZONE_STATE_FULL &&
            st != NVME_ZONE_STATE_READ_ONLY &&
            st != NVME_ZONE_STATE_OFFLINE;
 }
 
-static inline uint8_t *zns_get_zd_extension(NvmeNamespace *ns, uint32_t zone_idx)
+static inline uint8_t *hybrid_get_zd_extension(NvmeNamespace *ns, uint32_t zone_idx)
 {
     return &ns->ctrl->zd_extensions[zone_idx * ns->ctrl->zd_extension_size];
 }
 
-static inline void zns_aor_inc_open(NvmeNamespace *ns)
+static inline void hybrid_aor_inc_open(NvmeNamespace *ns)
 {
     FemuCtrl *n = ns->ctrl;
     assert(n->nr_open_zones >= 0);
@@ -194,7 +194,7 @@ static inline void zns_aor_inc_open(NvmeNamespace *ns)
     }
 }
 
-static inline void zns_aor_dec_open(NvmeNamespace *ns)
+static inline void hybrid_aor_dec_open(NvmeNamespace *ns)
 {
     FemuCtrl *n = ns->ctrl;
     if (n->max_open_zones) {
@@ -204,7 +204,7 @@ static inline void zns_aor_dec_open(NvmeNamespace *ns)
     assert(n->nr_open_zones >= 0);
 }
 
-static inline void zns_aor_inc_active(NvmeNamespace *ns)
+static inline void hybrid_aor_inc_active(NvmeNamespace *ns)
 {
     FemuCtrl *n = ns->ctrl;
     assert(n->nr_active_zones >= 0);
@@ -214,7 +214,7 @@ static inline void zns_aor_inc_active(NvmeNamespace *ns)
     }
 }
 
-static inline void zns_aor_dec_active(NvmeNamespace *ns)
+static inline void hybrid_aor_dec_active(NvmeNamespace *ns)
 {
     FemuCtrl *n = ns->ctrl;
     if (n->max_active_zones) {
@@ -225,7 +225,7 @@ static inline void zns_aor_dec_active(NvmeNamespace *ns)
     assert(n->nr_active_zones >= 0);
 }
 
-void zns_ns_shutdown(NvmeNamespace *ns);
-void zns_ns_cleanup(NvmeNamespace *ns);
+void hybrid_ns_shutdown(NvmeNamespace *ns);
+void hybrid_ns_cleanup(NvmeNamespace *ns);
 
 #endif

@@ -1,7 +1,7 @@
 #include "../nvme.h"
 #include "./ftl.h"
 
-static void bb_init_ctrl_str(FemuCtrl *n)
+static void hybrid_bb_init_ctrl_str(FemuCtrl *n)
 {
     static int fsid_vbb = 0;
     const char *vbbssd_mn = "FEMU BlackBox-SSD Controller";
@@ -11,19 +11,19 @@ static void bb_init_ctrl_str(FemuCtrl *n)
 }
 
 /* bb <=> black-box */
-static void bb_init(FemuCtrl *n, Error **errp)
+static void hybrid_bb_init(FemuCtrl *n, Error **errp)
 {
     struct ssd *ssd = n->ssd = g_malloc0(sizeof(struct ssd));
 
-    bb_init_ctrl_str(n);
+    hybrid_bb_init_ctrl_str(n);
 
     ssd->dataplane_started_ptr = &n->dataplane_started;
     ssd->ssdname = (char *)n->devname;
     femu_debug("Starting FEMU in Blackbox-SSD mode ...\n");
-    ssd_init(n);
+    hybrid_ssd_init(n);
 }
 
-static void bb_flip(FemuCtrl *n, NvmeCmd *cmd)
+static void hybrid_bb_flip(FemuCtrl *n, NvmeCmd *cmd)
 {
     struct ssd *ssd = n->ssd;
     int64_t cdw10 = le64_to_cpu(cmd->cdw10);
@@ -70,44 +70,44 @@ static void bb_flip(FemuCtrl *n, NvmeCmd *cmd)
     }
 }
 
-static uint16_t bb_nvme_rw(FemuCtrl *n, NvmeNamespace *ns, NvmeCmd *cmd,
+static uint16_t hybrid_bb_nvme_rw(FemuCtrl *n, NvmeNamespace *ns, NvmeCmd *cmd,
                            NvmeRequest *req)
 {
     return nvme_rw(n, ns, cmd, req);
 }
 
-static uint16_t bb_io_cmd(FemuCtrl *n, NvmeNamespace *ns, NvmeCmd *cmd,
+static uint16_t hybrid_bb_io_cmd(FemuCtrl *n, NvmeNamespace *ns, NvmeCmd *cmd,
                           NvmeRequest *req)
 {
     switch (cmd->opcode) {
     case NVME_CMD_READ:
     case NVME_CMD_WRITE:
-        return bb_nvme_rw(n, ns, cmd, req);
+        return hybrid_bb_nvme_rw(n, ns, cmd, req);
     default:
         return NVME_INVALID_OPCODE | NVME_DNR;
     }
 }
 
-static uint16_t bb_admin_cmd(FemuCtrl *n, NvmeCmd *cmd)
+static uint16_t hybrid_bb_admin_cmd(FemuCtrl *n, NvmeCmd *cmd)
 {
     switch (cmd->opcode) {
     case NVME_ADM_CMD_FEMU_FLIP:
-        bb_flip(n, cmd);
+        hybrid_bb_flip(n, cmd);
         return NVME_SUCCESS;
     default:
         return NVME_INVALID_OPCODE | NVME_DNR;
     }
 }
 
-int nvme_register_bbssd(FemuCtrl *n)
+int nvme_register_hybrid(FemuCtrl *n)
 {
     n->ext_ops = (FemuExtCtrlOps) {
         .state            = NULL,
-        .init             = bb_init,
+        .init             = hybrid_bb_init,
         .exit             = NULL,
         .rw_check_req     = NULL,
-        .admin_cmd        = bb_admin_cmd,
-        .io_cmd           = bb_io_cmd,
+        .admin_cmd        = hybrid_bb_admin_cmd,
+        .io_cmd           = hybrid_bb_io_cmd,
         .get_log          = NULL,
     };
 
