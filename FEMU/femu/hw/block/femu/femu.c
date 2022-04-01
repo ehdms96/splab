@@ -510,8 +510,8 @@ static int nvme_register_extensions(FemuCtrl *n)
     } else if (ZNSSD(n)) {
         nvme_register_znssd(n);
     } else if (HYSSD(n)) {
-        nvme_register_hyssd(n); //zns
-        //nvme_register_hybrid(n); //bb
+        nvme_register_hyssd(n); //zns version
+        //nvme_register_hybrid(n); //bb version
     } else {
     }
 

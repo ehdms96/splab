@@ -131,7 +131,7 @@ static void nvme_process_cq_cpl(void *arg, int index_poller)
     int processed = 0;
     int rc;
 
-    if (BBSSD(n)) { // ||HYSSD(n)) { //HYSSD에서 bb단위로 하고싶을 경우 추가해야함
+    if (BBSSD(n)){ //||HYSSD(n)) { //HYSSD에서 bb단위로 하고싶을 경우 추가해야함
         rp = n->to_poller[index_poller];
     }
 
