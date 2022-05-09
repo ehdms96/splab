@@ -1055,6 +1055,7 @@ typedef struct Oc12Ctrl Oc12Ctrl;
 
 typedef struct NvmeIdNsZoned NvmeIdNsZoned;
 typedef struct NvmeZone NvmeZone;
+typedef struct NvmeRZone NvmeRZone;
 
 typedef struct NvmeNamespace {
     struct FemuCtrl *ctrl;
@@ -1172,6 +1173,10 @@ typedef struct FemuCtrl {
     MemoryRegion    iomem;
     MemoryRegion    ctrl_mem;
     NvmeBar         bar;
+
+    /* for HYSSD */
+    bool            isRzoned;
+    NvmeRZone        *Rzone_array;
 
     /* Coperd: ZNS FIXME */
     QemuUUID        uuid;
