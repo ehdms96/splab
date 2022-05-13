@@ -1,25 +1,15 @@
 #include "../nvme.h"
 #include "./ftl.h"
-
-static void hybrid_bb_init_ctrl_str(FemuCtrl *n)
-{
-    static int fsid_vbb = 0;
-    const char *vbbssd_mn = "FEMU BlackBox-SSD Controller";
-    const char *vbbssd_sn = "vSSD";
-
-    nvme_set_ctrl_name(n, vbbssd_mn, vbbssd_sn, &fsid_vbb);
-}
+#include "./zns.h"
 
 /* bb <=> black-box */
 static void hybrid_bb_init(FemuCtrl *n, Error **errp)
 {
-    struct ssd *ssd = n->ssd = g_malloc0(sizeof(struct ssd));
-
-    hybrid_bb_init_ctrl_str(n);
+    struct ssd *ssd = n->Rzone_array->ssd = g_malloc0(sizeof(struct ssd));
 
     ssd->dataplane_started_ptr = &n->dataplane_started;
     ssd->ssdname = (char *)n->devname;
-    femu_debug("Starting FEMU in Blackbox-SSD mode ...\n");
+    femu_debug("Starting FEMU in HYSSD random write mode ...\n");
     hybrid_ssd_init(n);
 }
 

@@ -15,6 +15,8 @@ static inline uint32_t hybrid_zone_idx(NvmeNamespace *ns, uint64_t slba)
 static inline NvmeZone *hybrid_get_zone_by_slba(NvmeNamespace *ns, uint64_t slba)
 {
     FemuCtrl *n = ns->ctrl;
+    femu_log("start lba : %lu, zone idx : %u\n", slba, hybrid_zone_idx(ns, slba));
+
     uint32_t zone_idx = hybrid_zone_idx(ns, slba);
 
     assert(zone_idx < n->num_zones);
@@ -26,6 +28,7 @@ static int hybrid_init_zone_geometry(NvmeNamespace *ns, Error **errp)
     FemuCtrl *n = ns->ctrl;
     uint64_t zone_size, zone_cap;
     uint32_t lbasz = 1 << hybrid_ns_lbads(ns);
+    femu_log("lbasz size : %u B\n",lbasz);
 
     if (n->zone_size_bs) {
         zone_size = n->zone_size_bs;
@@ -53,8 +56,14 @@ static int hybrid_init_zone_geometry(NvmeNamespace *ns, Error **errp)
     }
 
     n->zone_size = zone_size / lbasz;
+    femu_log("zone size : %u B\n", n->zone_size);
+    
     n->zone_capacity = zone_cap / lbasz;
+    femu_log("zone capacity : %lu B\n", n->zone_capacity);
+    
     n->num_zones = ns->size / lbasz / n->zone_size;
+    n->num_Rzones = 1;
+    femu_log("Rzone num : %d, zone num : %d\n", n->num_Rzones, n->num_zones);
 
     if (n->max_open_zones > n->num_zones) {
         femu_err("max_open_zones value %u exceeds the number of zones %u",
@@ -84,11 +93,13 @@ static int hybrid_init_zone_geometry(NvmeNamespace *ns, Error **errp)
 static void hybrid_init_zoned_state(NvmeNamespace *ns)
 {
     FemuCtrl *n = ns->ctrl;
-    uint64_t start = 0, zone_size = n->zone_size;
+    uint64_t start = 0, Rstart = 0, zone_size = n->zone_size;
     uint64_t capacity = n->num_zones * zone_size;
     NvmeZone *zone;
+    NvmeRZone *Rzone;
     int i;
 
+    n->Rzone_array = g_new0(NvmeRZone, n->num_Rzones);
     n->zone_array = g_new0(NvmeZone, n->num_zones);
     if (n->zd_extension_size) {
         n->zd_extensions = g_malloc0(n->zd_extension_size * n->num_zones);
@@ -99,18 +110,35 @@ static void hybrid_init_zoned_state(NvmeNamespace *ns)
     QTAILQ_INIT(&n->closed_zones);
     QTAILQ_INIT(&n->full_zones);
 
+    Rzone = n->Rzone_array;
+    Rzone->d.zt = NVME_ZONE_TYPE_SEQ_WRITE;
+    //hybrid_set_zone_state(zone, NVME_ZONE_STATE_EMPTY);
+    Rzone->d.za = 0;
+    Rzone->d.zcap = n->zone_capacity;
+    Rzone->d.zslba = Rstart;
+    Rzone->d.wp = Rstart;
+    Rzone->w_ptr = Rstart;
+    femu_log("Rzone start LBA : %d\n", Rzone->d.zslba);
+
     zone = n->zone_array;
     for (i = 0; i < n->num_zones; i++, zone++) {
-        if (start + zone_size > capacity) {
-            zone_size = capacity - start;
-        }
-        zone->d.zt = NVME_ZONE_TYPE_SEQ_WRITE;
-        hybrid_set_zone_state(zone, NVME_ZONE_STATE_EMPTY);
-        zone->d.za = 0;
-        zone->d.zcap = n->zone_capacity;
-        zone->d.zslba = start;
-        zone->d.wp = start;
-        zone->w_ptr = start;
+
+        //if(start!=0){
+            if (start + zone_size > capacity) {
+                zone_size = capacity - start;
+                femu_log("zone size : %u B\n", zone_size);
+            }
+            zone->d.zt = NVME_ZONE_TYPE_SEQ_WRITE;
+            hybrid_set_zone_state(zone, NVME_ZONE_STATE_EMPTY);
+            zone->d.za = 0;
+            zone->d.zcap = n->zone_capacity;
+            zone->d.zslba = start;
+            zone->d.wp = start;
+            zone->w_ptr = start;
+
+            femu_log("#%d zone start LBA : %d\n", i+1, zone->d.zslba);
+        //}
+
         start += zone_size;
     }
 
@@ -346,6 +374,8 @@ static uint16_t hybrid_check_zone_write(FemuCtrl *n, NvmeNamespace *ns,
 static uint16_t hybrid_check_zone_state_for_read(NvmeZone *zone)
 {
     uint16_t status;
+
+    femu_log("zone state : %u\n", hybrid_get_zone_state(zone));
 
     switch (hybrid_get_zone_state(zone)) {
     case NVME_ZONE_STATE_EMPTY:
@@ -888,6 +918,7 @@ static bool hybrid_zone_matches_filter(uint32_t zafs, NvmeZone *zl)
     }
 }
 
+// Zone Management Receive
 static uint16_t hybrid_zone_mgmt_recv(FemuCtrl *n, NvmeRequest *req)
 {
     NvmeCmd *cmd = (NvmeCmd *)&req->cmd;
@@ -922,7 +953,7 @@ static uint16_t hybrid_zone_mgmt_recv(FemuCtrl *n, NvmeRequest *req)
         return NVME_INVALID_FIELD | NVME_DNR;
     }
 
-    zrasf = (dw13 >> 8) & 0xff;
+    zrasf = (dw13 >> 8) & 0xff; //zone receive action specific field
     if (zrasf > NVME_ZONE_REPORT_OFFLINE) {
         return NVME_INVALID_FIELD | NVME_DNR;
     }
@@ -1040,6 +1071,9 @@ static uint16_t hybrid_do_write(FemuCtrl *n, NvmeRequest *req, bool append,
     NvmeNamespace *ns = req->ns;
     uint64_t slba = le64_to_cpu(rw->slba);
     uint32_t nlb = (uint32_t)le16_to_cpu(rw->nlb) + 1;
+
+    femu_log("hybrid io_cmd DOWRITE rw->nlb : %u, nlb+1 : %u\n", (uint32_t)le16_to_cpu(rw->nlb), nlb);
+
     uint64_t data_size = hybrid_l2b(ns, nlb);
     uint64_t data_offset;
     NvmeZone *zone;
@@ -1119,6 +1153,10 @@ static uint16_t hybrid_read(FemuCtrl *n, NvmeNamespace *ns, NvmeCmd *cmd,
     NvmeRwCmd *rw = (NvmeRwCmd *)&req->cmd;
     uint64_t slba = le64_to_cpu(rw->slba);
     uint32_t nlb = (uint32_t)le16_to_cpu(rw->nlb) + 1;
+
+    femu_log("hybrid io_cmd READ slba : %u\n", slba);
+    femu_log("hybrid io_cmd READ rw->nlb : %u, nlb+1 : %u\n", (uint32_t)le16_to_cpu(rw->nlb), nlb);
+
     uint64_t data_size = hybrid_l2b(ns, nlb);
     uint64_t data_offset;
     uint16_t status;
@@ -1240,8 +1278,8 @@ static uint16_t hybrid_io_cmd(FemuCtrl *n, NvmeNamespace *ns, NvmeCmd *cmd,
 static void hybrid_set_ctrl_str(FemuCtrl *n)
 {
     static int fsid_zns = 0;
-    const char *zns_mn = "FEMU ZNS-SSD Controller";
-    const char *zns_sn = "vZNSSD";
+    const char *zns_mn = "FEMU HYSSD Controller";
+    const char *zns_sn = "vHYSSD";
 
     nvme_set_ctrl_name(n, zns_mn, zns_sn, &fsid_zns);
 }
@@ -1294,6 +1332,7 @@ static void hybrid_init(FemuCtrl *n, Error **errp)
     hybrid_set_ctrl(n);
 
     hybrid_init_zone_cap(n);
+
 
     if (hybrid_init_zone_geometry(ns, errp) != 0) {
         return;

@@ -421,8 +421,8 @@ typedef struct NvmeRwCmd {
     uint64_t    mptr;
     uint64_t    prp1;
     uint64_t    prp2;
-    uint64_t    slba;
-    uint16_t    nlb;
+    uint64_t    slba;   //start lba
+    uint16_t    nlb;    //number of logical block
     uint16_t    control;
     uint32_t    dsmgmt;
     uint32_t    reftag;
@@ -848,16 +848,19 @@ typedef struct NvmeRangeType {
 
 typedef struct NvmeLBAF {
     uint16_t    ms;
-    uint8_t     lbads;
+    uint8_t     lbads; //lba data size
     uint8_t     rp;
 } NvmeLBAF;
 
 #define NVME_NSID_BROADCAST 0xffffffff
 
 typedef struct NvmeIdNs {
-    uint64_t    nsze;
-    uint64_t    ncap;
-    uint64_t    nuse;
+    uint64_t    nsze;   /* namespace size 
+                         * field defines the total size of the namespace 
+                         * in logical blocks (LBA 0 through n-1)
+                         */
+    uint64_t    ncap;   //namespace capacity
+    uint64_t    nuse;   //namespace utilization
     uint8_t     nsfeat;
     uint8_t     nlbaf;
     uint8_t     flbas;
@@ -1071,7 +1074,7 @@ typedef struct NvmeNamespace {
     uint64_t        tbl_dsk_start_offset;
     uint32_t        tbl_entries;
     uint64_t        *tbl;
-    Oc12Bbt   **bbtbl;
+    Oc12Bbt         **bbtbl;
 
     /* Coperd: OC20 */
     struct {
@@ -1175,8 +1178,8 @@ typedef struct FemuCtrl {
     NvmeBar         bar;
 
     /* for HYSSD */
-    bool            isRzoned;
     NvmeRZone        *Rzone_array;
+    uint32_t        num_Rzones;
 
     /* Coperd: ZNS FIXME */
     QemuUUID        uuid;

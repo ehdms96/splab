@@ -1,4 +1,5 @@
 #include "ftl.h"
+#include "zns.h"
 
 //#define FEMU_DEBUG_FTL
 
@@ -362,7 +363,7 @@ static void hybrid_ssd_init_rmap(struct ssd *ssd)
 
 void hybrid_ssd_init(FemuCtrl *n)
 {
-    struct ssd *ssd = n->ssd;
+    struct ssd *ssd = n->Rzone_array->ssd;
     struct ssdparams *spp = &ssd->sp;
 
     ftl_assert(ssd);

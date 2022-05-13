@@ -4,5 +4,6 @@
         "ftl.h": "c",
         "msix.h": "c",
         "vhost.h": "c"
-    }
+    },
+    "C_Cpp.errorSquiggles": "Disabled"
 }
