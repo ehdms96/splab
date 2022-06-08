@@ -1473,12 +1473,13 @@ static inline hwaddr nvme_discontig(uint64_t *dma_addr, uint16_t page_size,
 
 static inline uint16_t nvme_check_mdts(FemuCtrl *n, size_t len)
 {
+    printf("nvme_check_mdts start\n");
     uint8_t mdts = n->mdts;
 
     if (mdts && len > n->page_size << mdts) {
         return NVME_INVALID_FIELD | NVME_DNR;
     }
-
+    printf("nvme_check_mdts end\n");
     return NVME_SUCCESS;
 }
 

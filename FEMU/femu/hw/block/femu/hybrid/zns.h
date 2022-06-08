@@ -162,6 +162,7 @@ static inline void hybrid_set_zone_state(NvmeZone *zone, NvmeZoneState state)
 
 static inline uint64_t hybrid_zone_rd_boundary(NvmeNamespace *ns, NvmeZone *zone)
 {
+    printf("hybrid_zone_rd_boundary check : %llu\n", zone->d.zslba + ns->ctrl->zone_size);
     return zone->d.zslba + ns->ctrl->zone_size;
 }
 

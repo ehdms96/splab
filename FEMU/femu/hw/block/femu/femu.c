@@ -363,6 +363,7 @@ static int nvme_init_namespaces(FemuCtrl *n, Error **errp)
 {
     /* FIXME: FEMU only supports 1 namesapce now */
     //assert(n->num_namespaces == 1);
+    printf("nvme_init_namespaces start\n");
 
     for (int i = 0; i < n->num_namespaces; i++) {
         NvmeNamespace *ns = &n->namespaces[i];
@@ -373,8 +374,11 @@ static int nvme_init_namespaces(FemuCtrl *n, Error **errp)
         if (nvme_init_namespace(n, ns, errp)) {
             return 1;
         }
+
+         printf("[LOG#%d] ns->size : %llu, ns->start_block : %llu, ns->id : %u\n", i, ns->size, ns->start_block, ns->id);
     }
 
+    printf("nvme_init_namespaces end\n");
     return 0;
 }
 
